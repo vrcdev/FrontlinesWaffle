@@ -4448,7 +4448,7 @@ local function getTarget()
 				if on then
 					local d = (sp - mPos).Magnitude
 					if d < bestScore then
-						if not CFG.WallCheck or rayVisible(cam.CFrame.Position, pp, char) then
+						if flag("wallbang", false) or not CFG.WallCheck or rayVisible(cam.CFrame.Position, pp, char) then
 							best, bestScore = subj, d
 						end
 					end
@@ -4606,6 +4606,7 @@ do
 		callback = function(o) CFG.AimPart = o end})
 	s:toggle({name = "Wall check", flag = "wall_check", default = true,
 		callback = function(v) CFG.WallCheck = v end})
+	s:toggle({name = "Wallbang (ignore walls)", flag = "wallbang", default = false})
 end
 local acol2 = Aiming:column()
 do
