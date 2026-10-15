@@ -4634,6 +4634,16 @@ do
 		FL_G.__flUnload = nil
 	end
 	FL_G.__flUnload = flUnload
+	s:button({name = "Save config", callback = function()
+		pcall(function()
+			if writefile then writefile("fl_cfg.json", library:get_config()) end
+		end)
+	end})
+	s:button({name = "Load config", callback = function()
+		pcall(function()
+			if isfile and isfile("fl_cfg.json") then library:load_config(readfile("fl_cfg.json")) end
+		end)
+	end})
 	s:button({name = "Unload", callback = flUnload})
 end
 
@@ -4643,4 +4653,8 @@ library:connection(uis.InputBegan, function(input, gpe)
 	elseif input.KeyCode == Enum.KeyCode.End then
 		flUnload()
 	end
+end)
+
+pcall(function()
+	if isfile and isfile("fl_cfg.json") then library:load_config(readfile("fl_cfg.json")) end
 end)
