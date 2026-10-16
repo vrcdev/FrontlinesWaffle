@@ -41,6 +41,14 @@ for _, t in ipairs(getactorthreads()) do
 		end
 	]], BASE))
 end
+local libSrc = fetch(BASE .. "abyss_lib.lua")
+if libSrc then
+	local lf, le = loadstring(libSrc)
+	if lf then pcall(lf) else warn("[fl] lib compile:", le) end
+else
+	warn("[fl] lib fetch failed")
+	return
+end
 local f, e = loadstring(fetch(BASE .. "click_frontlines.luau"))
 assert(f, e)
 local ok, err = pcall(f)

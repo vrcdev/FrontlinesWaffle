@@ -9,326 +9,35 @@ local vec2 = Vector2.new
 local cfr = CFrame.new
 local rgb = Color3.fromRGB
 local min, max, abs = math.min, math.max, math.abs
-local FL_CONNS = {}
-local function flConn(sig, fn)
-	local c = sig:Connect(fn)
-	table.insert(FL_CONNS, c)
-	return c
-end
 
-local UI = (function()
-local uis = game:GetService("UserInputService")
-local players = game:GetService("Players")
-local lp = players.LocalPlayer
+local Library = getgenv().Library or Library
 
-local UI = {}
-UI.Flags = {}
-UI.CBS = {}
-
-local function guiParent()
-	if gethui then local ok, h = pcall(gethui) if ok and h then return h end end
-	local ok, cg = pcall(function() return game:GetService("CoreGui") end)
-	if ok and cg then return cg end
-	return lp:WaitForChild("PlayerGui")
-end
-
-local C = {
-	bg = Color3.fromRGB(18, 18, 22),
-	panel = Color3.fromRGB(26, 26, 33),
-	head = Color3.fromRGB(34, 34, 44),
-	row = Color3.fromRGB(30, 30, 40),
-	rowHot = Color3.fromRGB(44, 40, 60),
-	accent = Color3.fromRGB(150, 90, 255),
-	accent2 = Color3.fromRGB(110, 200, 255),
-	text = Color3.fromRGB(220, 220, 230),
-	dim = Color3.fromRGB(140, 140, 155),
-	on = Color3.fromRGB(120, 255, 140),
-}
-
-local function mk(cls, props, parent)
-	local i = Instance.new(cls)
-	for k, v in pairs(props) do i[k] = v end
-	i.Parent = parent
-	return i
-end
-
-local function round(i, r) mk("UICorner", {CornerRadius = UDim.new(0, r or 6)}, i) end
-local function pad(i, l, r, t, b)
-	mk("UIPadding", {PaddingLeft = UDim.new(0, l or 0), PaddingRight = UDim.new(0, r or 0),
-		PaddingTop = UDim.new(0, t or 0), PaddingBottom = UDim.new(0, b or 0)}, i)
-end
-local function draggable(handle, frame)
-	local drag, ds, sp
-	handle.InputBegan:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 then
-			drag, ds, sp = true, i.Position, frame.Position
+local Utility = getgenv().Utility
+if Utility and Utility.AddImage then
+	pcall(function()
+		if makefolder then
+			pcall(makefolder, "Abyss") pcall(makefolder, "Abyss/Caches") pcall(makefolder, "Abyss/Assets")
+			pcall(makefolder, "Abyss/Assets/UI") pcall(makefolder, "Abyss/Configs") pcall(makefolder, "Abyss/Scripts")
+			pcall(makefolder, "Waffle") pcall(makefolder, "Waffle/Assets")
 		end
-	end)
-	uis.InputChanged:Connect(function(i)
-		if drag and i.UserInputType == Enum.UserInputType.MouseMovement then
-			local d = i.Position - ds
-			frame.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y)
-		end
-	end)
-	uis.InputEnded:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = false end
-	end)
-end
-
-function UI:Init(title)
-	local sg = mk("ScreenGui", {Name = "waffle_clickgui", ResetOnSpawn = false,
-		ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 999, IgnoreGuiInset = true}, guiParent())
-	self.sg = sg
-	self.x = 80
-	self.title = title
-	return sg
-end
-
-function UI:Category(name)
-	local f = mk("Frame", {BackgroundColor3 = C.panel, BorderSizePixel = 0,
-		Position = UDim2.new(0, self.x, 0, 90), Size = UDim2.new(0, 230, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y}, self.sg)
-	round(f, 8)
-	mk("UIStroke", {Color = Color3.fromRGB(60, 55, 80), Thickness = 1, Transparency = 0.3}, f)
-	self.x = self.x + 244
-
-	local head = mk("TextLabel", {BackgroundColor3 = C.head, BorderSizePixel = 0,
-		Size = UDim2.new(1, 0, 0, 30), Font = Enum.Font.GothamBold, TextSize = 14,
-		TextColor3 = C.accent2, Text = name}, f)
-	round(head, 8)
-	draggable(head, f)
-
-	local list = mk("Frame", {BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y, Position = UDim2.new(0, 0, 0, 32)}, f)
-	mk("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 2)}, list)
-	pad(list, 4, 4, 0, 6)
-
-	local cat = {list = list, sg = self.sg}
-	return setmetatable(cat, {__index = UI.Cat})
-end
-
-UI.Cat = {}
-UI.Cat.__index = UI.Cat
-
-local function fire(flag, v)
-	local f = UI.CBS[flag]
-	if f then pcall(f, v) end
-end
-
-local function bindableText(v)
-	return type(v) == "string" and v or "MB2"
-end
-
-function UI.Cat:Label(text)
-	mk("TextLabel", {BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 16),
-		Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = C.dim,
-		TextXAlignment = Enum.TextXAlignment.Left, Text = "  " .. text}, self.list)
-	pad(self.list, 0)
-end
-
-function UI.Cat:Module(name, flag, def)
-	UI.Flags[flag] = def == nil and false or def
-	local holder = mk("Frame", {BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y}, self.list)
-	mk("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 1)}, holder)
-
-	local btn = mk("TextButton", {BackgroundColor3 = C.row, BorderSizePixel = 0,
-		Size = UDim2.new(1, 0, 0, 26), Font = Enum.Font.GothamSemibold, TextSize = 13,
-		TextColor3 = C.text, Text = "  " .. name, TextXAlignment = Enum.TextXAlignment.Left}, holder)
-	round(btn, 5)
-
-	local dot = mk("Frame", {BackgroundColor3 = C.dim, Size = UDim2.new(0, 5, 0, 16),
-		Position = UDim2.new(1, -12, 0.5, -8)}, btn)
-	round(dot, 3)
-
-	local drop = mk("Frame", {BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y, Visible = false}, holder)
-	mk("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 1)}, drop)
-	pad(drop, 14, 0, 0, 2)
-
-	local mod = {drop = drop, flag = flag, sg = self.sg}
-	local function paint()
-		local on = UI.Flags[flag]
-		btn.TextColor3 = on and C.on or C.text
-		btn.BackgroundColor3 = on and C.rowHot or C.row
-		dot.BackgroundColor3 = on and C.accent or C.dim
-	end
-	paint()
-	btn.MouseButton1Click:Connect(function()
-		UI.Flags[flag] = not UI.Flags[flag]
-		fire(flag, UI.Flags[flag])
-		paint()
-	end)
-	btn.MouseButton2Click:Connect(function()
-		drop.Visible = not drop.Visible
-	end)
-	return setmetatable(mod, {__index = UI.Mod})
-end
-
-UI.Mod = {}
-UI.Mod.__index = UI.Mod
-
-local function settingRow(parent, label)
-	local row = mk("Frame", {BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 22)}, parent)
-	mk("TextLabel", {BackgroundTransparency = 1, Size = UDim2.new(0.55, 0, 1, 0),
-		Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = C.text,
-		TextXAlignment = Enum.TextXAlignment.Left, Text = label}, row)
-	return row
-end
-
-function UI.Mod:Toggle(name, flag, def)
-	UI.Flags[flag] = def == nil and false or def
-	local row = settingRow(self.drop, name)
-	local box = mk("TextButton", {BackgroundColor3 = C.dim, BorderSizePixel = 0,
-		Size = UDim2.new(0, 30, 0, 16), Position = UDim2.new(1, -34, 0.5, -8),
-		Text = ""}, row)
-	round(box, 4)
-	local knob = mk("Frame", {BackgroundColor3 = C.text, Size = UDim2.new(0, 10, 0, 10),
-		Position = UDim2.new(0, 3, 0.5, -5)}, box)
-	round(knob, 5)
-	local function paint()
-		local on = UI.Flags[flag]
-		box.BackgroundColor3 = on and C.accent or C.dim
-		knob.Position = on and UDim2.new(1, -13, 0.5, -5) or UDim2.new(0, 3, 0.5, -5)
-	end
-	paint()
-	box.MouseButton1Click:Connect(function()
-		UI.Flags[flag] = not UI.Flags[flag]
-		fire(flag, UI.Flags[flag])
-		paint()
+		local T = Library.Theme
+		T.Gradient = T.Gradient or Utility.AddImage("Abyss/Assets/UI/Gradient.png", "https://raw.githubusercontent.com/mvonwalk/Exterium/main/Gradient.png")
+		T.Hue = T.Hue or Utility.AddImage("Abyss/Assets/UI/Hue.png", "https://raw.githubusercontent.com/mvonwalk/Exterium/main/HuePicker.png")
+		T.Saturation = T.Saturation or Utility.AddImage("Abyss/Assets/UI/Saturation.png", "https://raw.githubusercontent.com/mvonwalk/Exterium/main/SaturationPicker.png")
+		T.SaturationCursor = T.SaturationCursor or Utility.AddImage("Abyss/Assets/UI/HueCursor.png", "https://raw.githubusercontent.com/mvonwalk/splix-assets/main/Images-cursor.png")
+		T.Logo = T.Logo or Utility.AddImage("Waffle/Assets/waffle.png", "https://raw.githubusercontent.com/vrcdev/FrontlinesWaffle/main/waffle.png")
+		T.Astolfo = T.Astolfo or Utility.AddImage("Abyss/Assets/UI/Astolfo.png", "https://i.imgur.com/T20cWY9.png")
+		T.Aiko = T.Aiko or Utility.AddImage("Abyss/Assets/UI/Aiko.png", "https://i.imgur.com/1gRIdko.png")
+		T.Rem = T.Rem or Utility.AddImage("Abyss/Assets/UI/Rem.png", "https://i.imgur.com/ykbRkhJ.png")
+		T.Violet = T.Violet or Utility.AddImage("Abyss/Assets/UI/Violet.png", "https://i.imgur.com/7B56w4a.png")
+		T.Asuka = T.Asuka or Utility.AddImage("Abyss/Assets/UI/Asuka.png", "https://i.imgur.com/3hwztNM.png")
 	end)
 end
 
-function UI.Mod:Slider(name, flag, minV, maxV, def, step)
-	UI.Flags[flag] = def
-	step = step or 1
-	local row = settingRow(self.drop, name)
-	local val = mk("TextLabel", {BackgroundTransparency = 1, Size = UDim2.new(0, 40, 1, 0),
-		Position = UDim2.new(1, -40, 0, 0), Font = Enum.Font.Gotham, TextSize = 11,
-		TextColor3 = C.accent2, Text = tostring(def), TextXAlignment = Enum.TextXAlignment.Right}, row)
-	local bar = mk("Frame", {BackgroundColor3 = C.head, Size = UDim2.new(0.42, 0, 0, 6),
-		Position = UDim2.new(0.55, 2, 0.5, -3)}, row)
-	round(bar, 3)
-	local fill = mk("Frame", {BackgroundColor3 = C.accent, Size = UDim2.new(0, 0, 1, 0)}, bar)
-	round(fill, 3)
-	local function set(v)
-		v = math.clamp(math.floor((v / step) + 0.5) * step, minV, maxV)
-		UI.Flags[flag] = v
-		val.Text = tostring(v)
-		fill.Size = UDim2.new((v - minV) / (maxV - minV), 0, 1, 0)
-		fire(flag, v)
-	end
-	set(def)
-	local slid = false
-	bar.InputBegan:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 then slid = true end
-	end)
-	uis.InputEnded:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 then slid = false end
-	end)
-	uis.InputChanged:Connect(function(i)
-		if slid and i.UserInputType == Enum.UserInputType.MouseMovement then
-			set(minV + (maxV - minV) * math.clamp((i.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1))
-		end
-	end)
-end
-
-function UI.Mod:Bind(name, flag, def)
-	UI.Flags[flag] = def
-	local row = settingRow(self.drop, name)
-	local btn = mk("TextButton", {BackgroundColor3 = C.head, BorderSizePixel = 0,
-		Size = UDim2.new(0, 62, 0, 16), Position = UDim2.new(1, -64, 0.5, -8),
-		Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = C.accent2, Text = bindableText(def)}, row)
-	round(btn, 4)
-	local binding = false
-	btn.MouseButton1Click:Connect(function()
-		binding = true
-		btn.Text = "..."
-		btn.TextColor3 = C.on
-	end)
-	uis.InputBegan:Connect(function(i, gpe)
-		if not binding then return end
-		binding = false
-		btn.TextColor3 = C.accent2
-		if i.UserInputType ~= Enum.UserInputType.Keyboard then
-			UI.Flags[flag] = i.UserInputType.Name
-		else
-			UI.Flags[flag] = i.KeyCode.Name
-		end
-		btn.Text = UI.Flags[flag]
-		fire(flag, UI.Flags[flag])
-	end)
-end
-
-function UI.Mod:Dropdown(name, flag, values, def)
-	UI.Flags[flag] = def
-	local row = settingRow(self.drop, name)
-	local btn = mk("TextButton", {BackgroundColor3 = C.head, BorderSizePixel = 0,
-		Size = UDim2.new(0, 100, 0, 16), Position = UDim2.new(1, -102, 0.5, -8),
-		Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = C.accent2, Text = def}, row)
-	round(btn, 4)
-	btn.MouseButton1Click:Connect(function()
-		local idx = table.find(values, UI.Flags[flag]) or 0
-		idx = idx % #values + 1
-		UI.Flags[flag] = values[idx]
-		btn.Text = values[idx]
-		fire(flag, values[idx])
-	end)
-	btn.MouseButton2Click:Connect(function()
-		local idx = (table.find(values, UI.Flags[flag]) or 2) - 1
-		if idx < 1 then idx = #values end
-		UI.Flags[flag] = values[idx]
-		btn.Text = values[idx]
-		fire(flag, values[idx])
-	end)
-end
-
-local PALETTE = {
-	Color3.fromRGB(255, 60, 60), Color3.fromRGB(255, 160, 40), Color3.fromRGB(255, 230, 60),
-	Color3.fromRGB(120, 255, 120), Color3.fromRGB(60, 200, 255), Color3.fromRGB(80, 200, 255),
-	Color3.fromRGB(150, 90, 255), Color3.fromRGB(255, 100, 200), Color3.fromRGB(255, 255, 255),
-}
-
-function UI.Mod:Palette(name, flag, def)
-	UI.Flags[flag] = def
-	local row = mk("Frame", {BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 20)}, self.drop)
-	mk("TextLabel", {BackgroundTransparency = 1, Size = UDim2.new(0.5, 0, 1, 0),
-		Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = C.text,
-		TextXAlignment = Enum.TextXAlignment.Left, Text = name}, row)
-	local holder = mk("Frame", {BackgroundTransparency = 1, Size = UDim2.new(0.5, 0, 1, 0),
-		Position = UDim2.new(0.5, 0, 0, 0)}, row)
-	mk("UIListLayout", {FillDirection = Enum.FillDirection.Horizontal,
-		Padding = UDim.new(0, 3), VerticalAlignment = Enum.VerticalAlignment.Center}, holder)
-	for _, c in ipairs(PALETTE) do
-		local b = mk("TextButton", {BackgroundColor3 = c, Size = UDim2.new(0, 14, 0, 14),
-			BorderSizePixel = 0, Text = ""}, holder)
-		round(b, 3)
-		b.MouseButton1Click:Connect(function() UI.Flags[flag] = c fire(flag, c) end)
-	end
-end
-
-function UI.Cat:Button(name, cb)
-	local btn = mk("TextButton", {BackgroundColor3 = C.row, BorderSizePixel = 0,
-		Size = UDim2.new(1, 0, 0, 24), Font = Enum.Font.Gotham, TextSize = 12,
-		TextColor3 = C.text, Text = name}, self.list)
-	round(btn, 5)
-	btn.MouseButton1Click:Connect(function() pcall(cb) end)
-end
-
-function UI:Destroy()
-	if self.sg then pcall(function() self.sg:Destroy() end) end
-end
-
-return UI
-
-end)()
-
--- ===================== FRONTLINES // devin =====================
 local FL_G = getrenv and getrenv()._G or _G
 if FL_G.__flUnload then pcall(FL_G.__flUnload) FL_G.__flUnload = nil end
 
-local Flags = UI.Flags
-
+local Flags = Library.Flags
 local function flag(name, default)
 	local v = Flags[name]
 	if v == nil then return default end
@@ -337,7 +46,7 @@ end
 
 local CFG = {
 	FOV = 220,
-	AimPart = "Head",
+	AimPart = "Head_M",
 	WallCheck = true,
 	Smooth = 0,
 }
@@ -380,7 +89,8 @@ local function isEnemy(p)
 	if not flag("team_check", true) then return true end
 	local mine, theirs = teamId(lp), teamId(p)
 	if mine == nil or theirs == nil then return true end
-	return mine ~= theirs
+	if mine == theirs then return false end
+	return tostring(mine) ~= tostring(theirs)
 end
 local function humanoidOf(p)
 	local c = p.Character
@@ -448,14 +158,6 @@ local function makeESP()
 	for i = 1, math.max(#R15BONES, #FLBONES) do e.skel[i] = mkLine() end
 	return e
 end
-
-local FL_DEAD = false
-local esp = {}
-local modelEsp = {}
-local function addPlayer(p) if p ~= lp then esp[p] = makeESP() end end
-for _, p in ipairs(players:GetPlayers()) do addPlayer(p) end
-players.PlayerAdded:Connect(addPlayer)
-
 local function removeESP(e)
 	if not e then return end
 	for _, l in ipairs(e.box) do l:Remove() end
@@ -464,6 +166,12 @@ local function removeESP(e)
 	if e.cham then e.cham:Destroy() end
 end
 
+local FL_DEAD = false
+local esp = {}
+local modelEsp = {}
+local function addPlayer(p) if p ~= lp then esp[p] = makeESP() end end
+for _, p in ipairs(players:GetPlayers()) do addPlayer(p) end
+players.PlayerAdded:Connect(addPlayer)
 players.PlayerRemoving:Connect(function(p)
 	removeESP(esp[p])
 	esp[p] = nil
@@ -659,7 +367,7 @@ end
 local function getTarget()
 	local mPos = uis:GetMouseLocation()
 	local cam = ws.CurrentCamera
-	local best, bestScore = nil, CFG.FOV
+	local best, bestScore = nil, flag("aim_fov", CFG.FOV)
 	local function scan(subj)
 		local char = subj.Character
 		if subj ~= lp and alive(subj) and isEnemy(subj) and char then
@@ -687,7 +395,14 @@ local fovCircle = Drawing.new("Circle")
 fovCircle.Thickness = 1 fovCircle.NumSides = 60 fovCircle.Color = rgb(255,255,255)
 fovCircle.Filled = false fovCircle.Visible = false
 
-run.RenderStepped:Connect(function()
+local conns = {}
+local function conn(sig, fn)
+	local c = sig:Connect(fn)
+	table.insert(conns, c)
+	return c
+end
+
+conn(run.RenderStepped, function()
 	if FL_DEAD then return end
 	for p, e in pairs(esp) do
 		pcall(updateESP, e, p)
@@ -695,19 +410,17 @@ run.RenderStepped:Connect(function()
 	for _, rec in pairs(modelEsp) do
 		pcall(updateESP, rec.e, rec.subj)
 	end
-	local aimOn = flag("aim_enable", true) and flag("aim_showfov", true)
-	fovCircle.Visible = aimOn
-	fovCircle.Radius = CFG.FOV
+	fovCircle.Visible = flag("aim_showfov", true) and (flag("silent_aim", true) or flag("cam_aim", false))
+	fovCircle.Radius = flag("aim_fov", CFG.FOV)
 	fovCircle.Position = uis:GetMouseLocation()
 end)
 
+local aimBindHeld = false
 local function aimHeld()
-	local kb = Flags["aim_bind"]
-	if type(kb) == "table" then return kb.active end
-	return uis:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+	return aimBindHeld or uis:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
 end
 
-run.RenderStepped:Connect(function()
+conn(run.RenderStepped, function()
 	if FL_DEAD then return end
 	if not flag("cam_aim", false) then return end
 	if not aimHeld() then return end
@@ -729,53 +442,58 @@ local function redirectTarget()
 	return curTarget
 end
 
-local silentOn = function() return not FL_DEAD and flag("silent_aim", true) and flag("aim_enable", true) end
+local silentOn = function() return not FL_DEAD and flag("silent_aim", true) end
 
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-	local method = getnamecallmethod()
-	if silentOn() and not checkcaller() then
-		if method == "Raycast" and self == ws then
-			local args = {...}
-			local origin, dir = args[1], args[2]
-			if typeof(origin) == "Vector3" and typeof(dir) == "Vector3" then
-				local t = redirectTarget()
-				if t then
-					args[2] = (t.Position - origin)
-					return oldNamecall(self, unpack(args))
+local oldNamecall, oldIndex
+local hooked = false
+if hookmetamethod and getnamecallmethod and newcclosure then
+	pcall(function()
+		oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+			local method = getnamecallmethod()
+			if silentOn() and not checkcaller() then
+				if method == "Raycast" and self == ws then
+					local args = {...}
+					local origin, dir = args[1], args[2]
+					if typeof(origin) == "Vector3" and typeof(dir) == "Vector3" then
+						local t = redirectTarget()
+						if t then
+							args[2] = (aimPos(t) - origin)
+							return oldNamecall(self, unpack(args))
+						end
+					end
+				elseif method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRay"
+					or method == "FindPartOnRayWithWhitelist" or method == "FindPartOnRayWithIgnoreListAndFilter" then
+					local args = {...}
+					local ray = args[1]
+					if typeof(ray) == "Ray" then
+						local t = redirectTarget()
+						if t then
+							args[1] = Ray.new(ray.Origin, aimPos(t) - ray.Origin)
+							return oldNamecall(self, unpack(args))
+						end
+					end
 				end
 			end
-		elseif method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRay"
-			or method == "FindPartOnRayWithWhitelist" or method == "FindPartOnRayWithIgnoreListAndFilter" then
-			local args = {...}
-			local ray = args[1]
-			if typeof(ray) == "Ray" then
-				local t = redirectTarget()
-				if t then
-					args[1] = Ray.new(ray.Origin, t.Position - ray.Origin)
-					return oldNamecall(self, unpack(args))
+			return oldNamecall(self, ...)
+		end))
+		oldIndex = hookmetamethod(game, "__index", newcclosure(function(self, k)
+			if not checkcaller() and silentOn() then
+				if self:IsA("Mouse") and (k == "Hit" or k == "Target") then
+					local t = redirectTarget()
+					if t then
+						if k == "Hit" then return t.CFrame end
+						return t
+					end
 				end
 			end
-		end
-	end
-	return oldNamecall(self, ...)
-end))
+			return oldIndex(self, k)
+		end))
+		hooked = true
+	end)
+end
+if not hooked then warn("[fl] hook install failed") end
 
-local oldIndex
-oldIndex = hookmetamethod(game, "__index", newcclosure(function(self, k)
-	if not checkcaller() and silentOn() then
-		if self:IsA("Mouse") and (k == "Hit" or k == "Target") then
-			local t = redirectTarget()
-			if t then
-				if k == "Hit" then return t.CFrame end
-				return t
-			end
-		end
-	end
-	return oldIndex(self, k)
-end))
-
-run.RenderStepped:Connect(function()
+conn(run.RenderStepped, function()
 	if FL_DEAD then return end
 	local t = silentOn() and redirectTarget() or nil
 	if t then
@@ -785,18 +503,92 @@ run.RenderStepped:Connect(function()
 	end
 end)
 
+local Controls = {}
+local Window = Library.Window("waffle // frontlines", vec2(540, 620))
+Window.Watermark("waffle")
+pcall(function() Window.ChangeAnime("Astolfo") end)
+Window.ToggleAnime(false)
 
+local combat = Window:Tab("combat")
+local aimSec = combat:Section("silent aim", "Left")
+Controls.silent_aim = aimSec:Toggle({Title = "enabled", Flag = "silent_aim", Default = true})
+Controls.aim_fov = aimSec:Slider({Title = "fov", Flag = "aim_fov", Min = 40, Max = 700, Default = 220, Decimals = 1, Callback = function(v) CFG.FOV = v end})
+Controls.aim_part = aimSec:Dropdown({Title = "bone", Flag = "aim_part", List = {"Head","Head_M","TPVBodyVanillaHead","HumanoidRootPart"}, Default = "Head_M", Callback = function(v) CFG.AimPart = v end})
+Controls.aim_showfov = aimSec:Toggle({Title = "show fov", Flag = "aim_showfov", Default = true})
+Controls.wall_check = aimSec:Toggle({Title = "wall check", Flag = "wall_check", Default = true, Callback = function(v) CFG.WallCheck = v end})
+Controls.wallbang = aimSec:Toggle({Title = "wallbang", Flag = "wallbang", Default = false})
 
-UI:Init("waffle")
-pcall(function() UI.sg.Enabled = false end)
-local menuOn = false
-local function toggleMenu()
-	menuOn = not menuOn
-	UI.sg.Enabled = menuOn
+local camSec = combat:Section("camera aim", "Right")
+local camTgl = camSec:Toggle({Title = "enabled", Flag = "cam_aim", Default = false})
+Controls.cam_aim = camTgl
+camTgl:Keybind({Title = "aim key", Flag = "aim_bind", Key = Enum.UserInputType.MouseButton2, StateType = "Hold",
+	Callback = function(state) aimBindHeld = state end})
+Controls.aim_smooth = camSec:Slider({Title = "smoothing", Flag = "aim_smooth", Min = 0, Max = 1, Default = 0, Decimals = 100, Callback = function(v) CFG.Smooth = v end})
+
+local vis = Window:Tab("visuals")
+local espSec = vis:Section("esp", "Left")
+Controls.esp_master = espSec:Toggle({Title = "master", Flag = "esp_master", Default = true})
+Controls.esp_boxes = espSec:Toggle({Title = "boxes", Flag = "esp_boxes", Default = true})
+Controls.esp_names = espSec:Toggle({Title = "names", Flag = "esp_names", Default = true})
+Controls.esp_dist = espSec:Toggle({Title = "distance", Flag = "esp_dist", Default = true})
+Controls.esp_health = espSec:Toggle({Title = "health", Flag = "esp_health", Default = true})
+Controls.esp_skel = espSec:Toggle({Title = "skeleton", Flag = "esp_skel", Default = true})
+Controls.esp_chams = espSec:Toggle({Title = "chams", Flag = "esp_chams", Default = false})
+Controls.esp_tracers = espSec:Toggle({Title = "tracers", Flag = "esp_tracers", Default = true})
+Controls.esp_arrows = espSec:Toggle({Title = "offscreen arrows", Flag = "esp_arrows", Default = true})
+Controls.team_check = espSec:Toggle({Title = "team check", Flag = "team_check", Default = true})
+local colSec = vis:Section("colors", "Right")
+Controls.col_enemy = colSec:Colorpicker({Title = "enemy", Flag = "col_enemy", Color = colEnemy, Callback = function(v) colEnemy = v end})
+Controls.col_friend = colSec:Colorpicker({Title = "friend", Flag = "col_friend", Color = colFriend, Callback = function(v) colFriend = v end})
+
+local function cfgPath()
+	local s = flag("cfg_slot", "default")
+	return s == "default" and "fl_cfg.json" or "fl_cfg_" .. s:gsub("%s+", "_") .. ".json"
 end
-
-local flUnload
-flUnload = function()
+local function saveCfg()
+	pcall(function()
+		local out = {}
+		for k, v in pairs(Flags) do
+			if typeof(v) == "Color3" then out[k] = {__col = v:ToHex()}
+			elseif typeof(v) == "EnumItem" then out[k] = {__enum = tostring(v)}
+			else out[k] = v end
+		end
+		if writefile then writefile(cfgPath(), http_service:JSONEncode(out)) end
+	end)
+end
+local function flagColor(name, fallback)
+	local v = Flags[name]
+	if typeof(v) == "Color3" then return v end
+	if type(v) == "string" and v:sub(1, 1) == "#" then return Color3.fromHex(v) end
+	return fallback
+end
+local function loadCfg()
+	pcall(function()
+		local path = cfgPath()
+		if not (isfile and isfile(path)) then return end
+		local cfg = http_service:JSONDecode(readfile(path))
+		for k, v in pairs(cfg) do
+			local ctl = Controls[k]
+			if type(v) == "table" and v.__col then v = v.__col end
+			if type(v) == "string" and v:sub(1, 1) == "#" and ctl and ctl.SetHue then
+				local c = Color3.fromHex(v)
+				local h, s, vv = c:ToHSV()
+				pcall(function() ctl:SetHue(h) ctl:SetSaturationX(s) ctl:SetSaturationY(vv) end)
+				Flags[k] = v
+			elseif k ~= "aim_bind" and type(v) ~= "table" then
+				if ctl and ctl.Set then pcall(function() ctl:Set(v) end)
+				else Flags[k] = v end
+			end
+		end
+		CFG.FOV = flag("aim_fov", 220)
+		CFG.AimPart = flag("aim_part", "Head_M")
+		CFG.Smooth = flag("aim_smooth", 0)
+		CFG.WallCheck = flag("wall_check", true)
+		colEnemy = flagColor("col_enemy", colEnemy)
+		colFriend = flagColor("col_friend", colFriend)
+	end)
+end
+local function flUnload()
 	if FL_DEAD then return end
 	FL_DEAD = true
 	for _, e in pairs(esp) do pcall(removeESP, e) end
@@ -804,81 +596,27 @@ flUnload = function()
 	table.clear(esp) table.clear(modelEsp)
 	pcall(function() fovCircle:Remove() end)
 	pcall(function() ws:SetAttribute("fl_t", nil) end)
-	for _, c in ipairs(FL_CONNS) do pcall(function() c:Disconnect() end) end
-	UI:Destroy()
+	if hooked then
+		pcall(function() hookmetamethod(game, "__namecall", oldNamecall) end)
+		pcall(function() hookmetamethod(game, "__index", oldIndex) end)
+	end
+	for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
+	pcall(function() Library.SelfDestruct() end)
 	FL_G.__flUnload = nil
 end
 FL_G.__flUnload = flUnload
 
-UI.CBS.aim_fov = function(v) CFG.FOV = v end
-UI.CBS.aim_part = function(v) CFG.AimPart = v end
-UI.CBS.aim_smooth = function(v) CFG.Smooth = v end
-UI.CBS.col_enemy = function(v) colEnemy = v end
-UI.CBS.col_friend = function(v) colFriend = v end
-
-local Combat = UI:Category("combat")
-local mAim = Combat:Module("silent aim", "silent_aim", true)
-mAim:Toggle("enabled", "aim_enable", true)
-mAim:Bind("aim key", "aim_bind", "MouseButton2")
-mAim:Slider("fov", "aim_fov", 40, 700, 220, 10)
-mAim:Dropdown("bone", "aim_part", {"Head","Head_M","TPVBodyVanillaHead","HumanoidRootPart"}, "Head_M")
-mAim:Toggle("show fov", "aim_showfov", true)
-mAim:Toggle("wall check", "wall_check", true)
-mAim:Toggle("wallbang", "wallbang", false)
-local mCam = Combat:Module("camera aim", "cam_aim", false)
-mCam:Slider("smoothing", "aim_smooth", 0, 1, 0, 0.05)
-
-local Vis = UI:Category("visuals")
-local mEsp = Vis:Module("esp", "esp_master", true)
-mEsp:Toggle("boxes", "esp_boxes", true)
-mEsp:Toggle("names", "esp_names", true)
-mEsp:Toggle("distance", "esp_dist", true)
-mEsp:Toggle("health", "esp_health", true)
-mEsp:Toggle("skeleton", "esp_skel", true)
-mEsp:Toggle("chams", "esp_chams", false)
-mEsp:Toggle("tracers", "esp_tracers", true)
-mEsp:Toggle("offscreen arrows", "esp_arrows", true)
-mEsp:Toggle("team check", "team_check", true)
-mEsp:Palette("enemy color", "col_enemy", colEnemy)
-mEsp:Palette("friend color", "col_friend", colFriend)
-
-local Misc = UI:Category("misc")
-Misc:Button("save config", function()
-	pcall(function()
-		local out = {}
-		for k, v in pairs(Flags) do
-			if typeof(v) == "Color3" then out[k] = {__col = v:ToHex()}
-			else out[k] = v end
-		end
-		if writefile then writefile("fl_cfg.json", http_service:JSONEncode(out)) end
-	end)
-end)
-Misc:Button("load config", function()
-	pcall(function()
-		if not (isfile and isfile("fl_cfg.json")) then return end
-		local cfg = http_service:JSONDecode(readfile("fl_cfg.json"))
-		for k, v in pairs(cfg) do
-			if type(v) == "table" and v.__col then v = Color3.fromHex(v.__col) end
-			Flags[k] = v
-			if UI.CBS[k] then pcall(UI.CBS[k], v) end
-		end
-	end)
-end)
-Misc:Button("unload", function() flUnload() end)
-
-flConn(uis.InputBegan, function(input)
-	if input.KeyCode == Enum.KeyCode.Delete then toggleMenu() end
+uis.InputBegan:Connect(function(input)
 	if input.KeyCode == Enum.KeyCode.End then flUnload() end
 end)
-toggleMenu()
 
-pcall(function()
-	if isfile and isfile("fl_cfg.json") then
-		local cfg = http_service:JSONDecode(readfile("fl_cfg.json"))
-		for k, v in pairs(cfg) do
-			if type(v) == "table" and v.__col then v = Color3.fromHex(v.__col) end
-			Flags[k] = v
-			if UI.CBS[k] then pcall(UI.CBS[k], v) end
-		end
-	end
-end)
+local settingsTab = Window:AddSettingsTab(flUnload)
+local cfgSec = settingsTab:Section("config", "Right")
+Controls.cfg_slot = cfgSec:Dropdown({Title = "slot", Flag = "cfg_slot", List = {"default", "slot 2", "slot 3"}, Default = "default"})
+cfgSec:Button({Title = "save config", Callback = saveCfg})
+cfgSec:Button({Title = "load config", Callback = loadCfg})
+cfgSec:Button({Title = "unload", Callback = flUnload})
+
+Window:SwitchTab(combat)
+loadCfg()
+print("[fl] waffle up — Delete toggles, End unloads")
